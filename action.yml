@@ -1,0 +1,19 @@
+name: "Django Deploy AWS"
+description: "Force a rolling restart of AWS resources to deploy a Django stack"
+inputs:
+  application:
+    description: "The tagged AWS name of your application"
+    required: true
+    default:
+  environment:
+    description: "The tagged environment name to deploy (i.e. dev, prod)"
+    required: true
+    default: 
+outputs:
+runs:
+  using: "docker"
+  image: "Dockerfile"
+  args:
+    - ${{ inputs.application }}
+    - ${{ inputs.environment }}
+
