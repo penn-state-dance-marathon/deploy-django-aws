@@ -14,7 +14,9 @@ This action forces a rolling restart of tagged AWS resources to initiate a rolli
 
 ## Example usage
 
+<pre>
 uses: actions/django-deploy-aws@v1
 with:
   application: 'dash'
   environment: 'prod'
+</pre>
