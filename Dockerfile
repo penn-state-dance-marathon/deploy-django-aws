@@ -6,9 +6,7 @@ RUN pip install --upgrade pip && \
     pip install --no-cache-dir boto3 && \
     pip install --no-cache-dir argparse
 
-ADD python_cicd.py /deploy-django-aws
-
-ADD entrypoint.sh /deploy-django-aws
+COPY . .
 
 RUN chmod +x ./entrypoint.sh
 
