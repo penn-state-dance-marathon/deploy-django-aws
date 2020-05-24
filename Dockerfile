@@ -6,8 +6,10 @@ RUN pip install --upgrade pip && \
     pip install --no-cache-dir boto3 && \
     pip install --no-cache-dir argparse
 
-COPY . .
+COPY entrypoint.sh /entrypoint.sh
 
-RUN chmod +x ./entrypoint.sh
+COPY python_cicd.py /python_cicd.py
 
-ENTRYPOINT ["./entrypoint.sh"]
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
