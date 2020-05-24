@@ -1,7 +1,5 @@
 FROM python:3.8
 
-RUN mdkir /deploy-django-aws
-
 WORKDIR /deploy-django-aws
 
 RUN pip install --upgrade pip && \
