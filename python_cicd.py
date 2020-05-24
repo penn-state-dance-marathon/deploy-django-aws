@@ -17,10 +17,10 @@ A few assumptions are made in this script due to the nature of AWS:
    <application>-<environment>-migrate
 
 Usage:
-  python aws_cicd.py <application> <environment>
+  python python_cicd.py <application> <environment>
 
 Example:
-  python aws_cicd.py dash dev
+  python python_cicd.py dash dev
 """
 import argparse
 import boto3
