@@ -4,6 +4,6 @@ RUN pip install --upgrade pip && \
     pip install --no-cache-dir boto3 && \
     pip install --no-cache-dir argparse
 
-COPY python_cicd.py /python_cicd.py
+ADD python_cicd.py /
 
-ENTRYPOINT ["python", "python_cicd.py", "$1", "$2"]
+CMD ["python", "./python_cicd.py", "$1", "$2"]
