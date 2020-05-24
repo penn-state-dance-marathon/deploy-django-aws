@@ -6,4 +6,4 @@ RUN pip install --upgrade pip && \
 
 ADD python_cicd.py /
 
-CMD ["python", "./python_cicd.py", "$1", "$2"]
+ENTRYPOINT ["python", "python_cicd.py", "$INPUT_APPLICATION", "$INPUT_ENVIRONMENT"]
