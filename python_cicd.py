@@ -25,6 +25,8 @@ Example:
 import argparse
 import boto3
 
+from datetime import datetime
+
 
 # Argument parser pulls in the application and environment
 parser = argparse.ArgumentParser()
@@ -86,10 +88,36 @@ def main():
     # Update each service in cluster, forcing new deployment
     services_resp = ecs.list_services(cluster=cluster_name)
     for service in services_resp['serviceArns']:
+        # Get the task definition associated with the service so we can
+        # use the latest one
+        service_info = ecs.describe_services(cluster=cluster_name,
+                                             services=[service])
+        service_task = service_info['services'][0]['taskDefinition']
+        task_info = ecs.describe_task_definition(taskDefinition=service_task)
+        task_family = task_info['taskDefinition']['family']
         ecs.update_service(
             cluster=cluster_name,
             service=service,
+            taskDefinition=task_family,
             forceNewDeployment=True)
+
+    # Invalidate the Cloudfront cache as well
+    app_tag = {'Key': 'Application', 'Value': args.application}
+    env_tag = {'Key': 'Environment', 'Value': args.environment}
+    cloudfront = boto3.client('cloudfront')
+    dists = cloudfront.list_distributions()['DistributionList']['Items']
+    for dist in dists:
+        tags = cloudfront.list_tags_for_resource(Resource=dist['ARN'])
+        tags = tags['Tags']['Items']
+        time = datetime.now().strftime('%Y%m%d%H%M%S%f')
+        if app_tag in tags and env_tag in tags:
+            cloudfront.create_invalidation(DistributionId=dist['Id'],
+                                           InvalidationBatch={
+                                               'Paths': {
+                                                   'Quantity': 1,
+                                                   'Items': ['/*']
+                                               },
+                                               'CallerReference': time})
 
 
 if __name__ == "__main__":
