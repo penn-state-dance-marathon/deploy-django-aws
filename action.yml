@@ -9,7 +9,6 @@ inputs:
     description: "The tagged environment name to deploy (i.e. dev, prod)"
     required: true
     default: 
-outputs:
 runs:
   using: "docker"
   image: "Dockerfile"
