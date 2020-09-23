@@ -69,21 +69,19 @@ def main():
         familyPrefix='{}-migrate'.format(cluster_name), sort='DESC')
     try:
         latest_migration_task = task_resp['taskDefinitionArns'][0]
+        ecs.run_task(cluster=cluster_name,
+                     launchType='FARGATE',
+                     taskDefinition=latest_migration_task,
+                     networkConfiguration={
+                         'awsvpcConfiguration': {
+                             'subnets': subnets,
+                             'securityGroups': security_groups,
+                             'assignPublicIp': 'ENABLED'
+                         }
+                     })
     except IndexError:
-        print('ERROR: There is no task definition following the "{}-migrate" '
-              ' naming convention.'.format(cluster_name))
-        return
-
-    ecs.run_task(cluster=cluster_name,
-                 launchType='FARGATE',
-                 taskDefinition=latest_migration_task,
-                 networkConfiguration={
-                     'awsvpcConfiguration': {
-                         'subnets': subnets,
-                         'securityGroups': security_groups,
-                         'assignPublicIp': 'ENABLED'
-                     }
-                 })
+        print('There is no task definition following the "{}-migrate"'
+              ' naming convention. Skipping...'.format(cluster_name))
 
     # Update each service in cluster, forcing new deployment
     services_resp = ecs.list_services(cluster=cluster_name)
