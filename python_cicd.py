@@ -69,16 +69,23 @@ def main():
         familyPrefix='{}-migrate'.format(cluster_name), sort='DESC')
     try:
         latest_migration_task = task_resp['taskDefinitionArns'][0]
-        ecs.run_task(cluster=cluster_name,
-                     launchType='FARGATE',
-                     taskDefinition=latest_migration_task,
-                     networkConfiguration={
-                         'awsvpcConfiguration': {
-                             'subnets': subnets,
-                             'securityGroups': security_groups,
-                             'assignPublicIp': 'ENABLED'
-                         }
-                     })
+        response = ecs.run_task(cluster=cluster_name,
+                                launchType='FARGATE',
+                                taskDefinition=latest_migration_task,
+                                networkConfiguration={
+                                    'awsvpcConfiguration': {
+                                        'subnets': subnets,
+                                        'securityGroups': security_groups,
+                                        'assignPublicIp': 'ENABLED'
+                                    }
+                                })
+        print('Successfully started migrate task. Waiting for it to complete...')
+        # Wait until the task enters tasks_stopped
+        # Inspired by https://stackoverflow.com/questions/33701140/using-aws-ecs-with-boto3
+        arn = response['tasks'][0]['taskArn']
+        waiter = ecs.get_waiter('tasks_stopped')
+        waiter.wait(cluster=cluster_name, tasks=[arn])
+        print('Migrate task complete.')
     except IndexError:
         print('There is no task definition following the "{}-migrate"'
               ' naming convention. Skipping...'.format(cluster_name))
