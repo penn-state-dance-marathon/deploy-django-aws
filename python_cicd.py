@@ -84,7 +84,7 @@ def main():
         # Inspired by https://stackoverflow.com/questions/33701140/using-aws-ecs-with-boto3
         arn = response['tasks'][0]['taskArn']
         waiter = ecs.get_waiter('tasks_stopped')
-        waiter.wait(cluster='default', tasks=[arn])
+        waiter.wait(cluster=cluster_name, tasks=[arn])
         print('Migrate task complete.')
     except IndexError:
         print('There is no task definition following the "{}-migrate"'
