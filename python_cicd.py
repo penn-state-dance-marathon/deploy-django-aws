@@ -24,6 +24,8 @@ Example:
 """
 import argparse
 import boto3
+import re
+import sys
 
 from datetime import datetime
 
@@ -65,6 +67,7 @@ def main():
     # Find the migration task definition and run it under sufficient security
     # groups and subnets
     ecs = boto3.client('ecs')
+    logs = boto3.client('logs')
     task_resp = ecs.list_task_definitions(
         familyPrefix='{}-migrate'.format(cluster_name), sort='DESC')
     try:
@@ -85,6 +88,32 @@ def main():
         arn = response['tasks'][0]['taskArn']
         waiter = ecs.get_waiter('tasks_stopped')
         waiter.wait(cluster=cluster_name, tasks=[arn])
+        # get log events
+        migration_log_group = '/ecs/{}/{}'.format(args.application, args.environment)
+        migration_log_stream = 'ecs-{}-{}/{}-{}/ed2635e5980e42f99c24eac071934cb5'.format(
+            args.application,
+            args.environment,
+            args.application,
+            args.environment,
+            arn
+            )
+        response = logs.get_log_events(
+            logGroupName=migration_log_group,
+            logStreamName=migration_log_stream,
+            startFromHead=True
+        )
+        migration_logs = response['events']
+        # look for migration errors
+        migration_failed = False
+        pattern = re.compile("django.db.utils.OperationalError|django.db.migrations.exceptions")
+        for event in migration_logs:
+            message = event['message']
+            print(message)
+            if bool(re.search(pattern, message)):
+                migration_failed = True
+        if migration_failed:
+            print('A migration error has occured: please see the above logs.', file=sys.stderr)
+            sys.exit(1)
         print('Migrate task complete.')
     except IndexError:
         print('There is no task definition following the "{}-migrate"'
