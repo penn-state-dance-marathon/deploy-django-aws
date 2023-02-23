@@ -24,7 +24,6 @@ Example:
 """
 import argparse
 import boto3
-import re
 import sys
 
 from datetime import datetime
@@ -72,6 +71,7 @@ def main():
         familyPrefix='{}-migrate'.format(cluster_name), sort='DESC')
     try:
         latest_migration_task = task_resp['taskDefinitionArns'][0]
+        # Launch migration task
         response = ecs.run_task(cluster=cluster_name,
                                 launchType='FARGATE',
                                 taskDefinition=latest_migration_task,
@@ -83,19 +83,21 @@ def main():
                                     }
                                 })
         print('Successfully started migrate task. Waiting for it to complete...')
+
         # Wait until the task enters tasks_stopped
         # Inspired by https://stackoverflow.com/questions/33701140/using-aws-ecs-with-boto3
-        arn = response['tasks'][0]['taskArn']
+        task_arn = response['tasks'][0]['taskArn']
         waiter = ecs.get_waiter('tasks_stopped')
-        waiter.wait(cluster=cluster_name, tasks=[arn])
-        # get log events
+        waiter.wait(cluster=cluster_name, tasks=[task_arn])
+
+        # Get log events
         migration_log_group = '/ecs/{}/{}'.format(args.application, args.environment)
-        migration_log_stream = 'ecs-{}-{}/{}-{}/ed2635e5980e42f99c24eac071934cb5'.format(
+        migration_log_stream = 'ecs-{}-{}/{}-{}/{}'.format(
             args.application,
             args.environment,
             args.application,
             args.environment,
-            arn
+            task_arn
             )
         response = logs.get_log_events(
             logGroupName=migration_log_group,
@@ -103,16 +105,18 @@ def main():
             startFromHead=True
         )
         migration_logs = response['events']
-        # look for migration errors
-        migration_failed = False
-        pattern = re.compile("django.db.utils.OperationalError|django.db.migrations.exceptions")
         for event in migration_logs:
             message = event['message']
             print(message)
-            if bool(re.search(pattern, message)):
-                migration_failed = True
-        if migration_failed:
-            print('A migration error has occured: please see the above logs.', file=sys.stderr)
+
+        # Get the container exit code - if not zero, houston we have a problem
+        response = ecs.describe_tasks(
+            cluster=cluster_name,
+            tasks=[task_arn]
+        )
+        task_exit_code = response['tasks']['containers']['exitCode']
+        if task_exit_code != 0:
+            print('A migration error has occurred: please see the above logs.', file=sys.stderr)
             sys.exit(1)
         print('Migrate task complete.')
     except IndexError:
