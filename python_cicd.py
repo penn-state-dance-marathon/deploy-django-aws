@@ -91,13 +91,14 @@ def main():
         waiter.wait(cluster=cluster_name, tasks=[task_arn])
 
         # Get log events
+        task_id = task_arn.split(cluster_name)[1].strip('/')
         migration_log_group = '/ecs/{}/{}'.format(args.application, args.environment)
         migration_log_stream = 'ecs-{}-{}/{}-{}/{}'.format(
             args.application,
             args.environment,
             args.application,
             args.environment,
-            task_arn
+            task_id
             )
         response = logs.get_log_events(
             logGroupName=migration_log_group,
@@ -114,7 +115,7 @@ def main():
             cluster=cluster_name,
             tasks=[task_arn]
         )
-        task_exit_code = response['tasks']['containers']['exitCode']
+        task_exit_code = response['tasks'][0]['containers'][0]['exitCode']
         if task_exit_code != 0:
             print('A migration error has occurred: please see the above logs.', file=sys.stderr)
             sys.exit(1)
