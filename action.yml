@@ -4,15 +4,21 @@ inputs:
   application:
     description: "The tagged AWS name of your application"
     required: true
-    default:
   environment:
     description: "The tagged environment name to deploy (i.e. dev, prod)"
     required: true
-    default: 
+  logGroupName:
+    description: "The name of the CloudWatch log group where logs are stored for this application."
+    required: false
+  logStreamPrefix:
+    description: "The characters that precede the task ID in the CloudWatch log stream name."
+    required: false
 runs:
   using: "docker"
   image: "Dockerfile"
   args:
     - ${{ inputs.application }}
     - ${{ inputs.environment }}
+    - ${{ inputs.logGroupName }}
+    - ${{ inputs.logStreamPrefix }}
 

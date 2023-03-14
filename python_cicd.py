@@ -37,6 +37,12 @@ parser.add_argument(
 parser.add_argument(
     'environment',
     help='which environment your are deploying (e.g. dev, prod)')
+parser.add_argument(
+    '-g', '--group',
+    help='the name of the CloudWatch log group where logs are stored.')
+parser.add_argument(
+    '-p', '--prefix',
+    help='the characters that precede the task ID in the CloudWatch log stream name')
 args = parser.parse_args()
 
 
@@ -44,6 +50,19 @@ def main():
     """Run the AWS commands"""
     # Prepare the naming convention of applications on AWS
     cluster_name = '{}-{}'.format(args.application, args.environment)
+
+    log_group_name = '/ecs/{}/{}'.format(args.application, args.environment)
+    if 'group' in args:
+        log_group_name = args.group
+
+    log_stream_prefix = 'ecs-{}-{}/{}-{}'.format(
+        args.application,
+        args.environment,
+        args.application,
+        args.environment
+    )
+    if 'stream' in args:
+        log_stream_prefix = args.stream
 
     # Get subnets and security groups to run migration task under
     ec2 = boto3.client('ec2')
@@ -92,17 +111,11 @@ def main():
 
         # Get log events
         task_id = task_arn.split(cluster_name)[1].strip('/')
-        migration_log_group = '/ecs/{}/{}'.format(args.application, args.environment)
-        migration_log_stream = 'ecs-{}-{}/{}-{}/{}'.format(
-            args.application,
-            args.environment,
-            args.application,
-            args.environment,
-            task_id
-            )
+        log_stream_name = '{}/{}'.format(log_stream_prefix, task_id)
+
         response = logs.get_log_events(
-            logGroupName=migration_log_group,
-            logStreamName=migration_log_stream,
+            logGroupName=log_group_name,
+            logStreamName=log_stream_name,
             startFromHead=True
         )
         migration_logs = response['events']
