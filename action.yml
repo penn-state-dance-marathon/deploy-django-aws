@@ -19,6 +19,3 @@ runs:
   args:
     - ${{ inputs.application }}
     - ${{ inputs.environment }}
-    - ${{ inputs.logGroupName }}
-    - ${{ inputs.logStreamPrefix }}
-
