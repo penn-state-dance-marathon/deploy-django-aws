@@ -24,6 +24,7 @@ Example:
 """
 import argparse
 import boto3
+import sys
 
 from datetime import datetime
 
@@ -36,6 +37,12 @@ parser.add_argument(
 parser.add_argument(
     'environment',
     help='which environment your are deploying (e.g. dev, prod)')
+parser.add_argument(
+    '-g', '--group',
+    help='the name of the CloudWatch log group where logs are stored.')
+parser.add_argument(
+    '-p', '--prefix',
+    help='the characters that precede the task ID in the CloudWatch log stream name')
 args = parser.parse_args()
 
 
@@ -43,6 +50,19 @@ def main():
     """Run the AWS commands"""
     # Prepare the naming convention of applications on AWS
     cluster_name = '{}-{}'.format(args.application, args.environment)
+
+    log_group_name = '/ecs/{}/{}'.format(args.application, args.environment)
+    if 'group' in args:
+        log_group_name = args.group
+
+    log_stream_prefix = 'ecs-{}-{}/{}-{}'.format(
+        args.application,
+        args.environment,
+        args.application,
+        args.environment
+    )
+    if 'stream' in args:
+        log_stream_prefix = args.stream
 
     # Get subnets and security groups to run migration task under
     ec2 = boto3.client('ec2')
@@ -65,10 +85,12 @@ def main():
     # Find the migration task definition and run it under sufficient security
     # groups and subnets
     ecs = boto3.client('ecs')
+    logs = boto3.client('logs')
     task_resp = ecs.list_task_definitions(
         familyPrefix='{}-migrate'.format(cluster_name), sort='DESC')
     try:
         latest_migration_task = task_resp['taskDefinitionArns'][0]
+        # Launch migration task
         response = ecs.run_task(cluster=cluster_name,
                                 launchType='FARGATE',
                                 taskDefinition=latest_migration_task,
@@ -80,11 +102,36 @@ def main():
                                     }
                                 })
         print('Successfully started migrate task. Waiting for it to complete...')
+
         # Wait until the task enters tasks_stopped
         # Inspired by https://stackoverflow.com/questions/33701140/using-aws-ecs-with-boto3
-        arn = response['tasks'][0]['taskArn']
+        task_arn = response['tasks'][0]['taskArn']
         waiter = ecs.get_waiter('tasks_stopped')
-        waiter.wait(cluster=cluster_name, tasks=[arn])
+        waiter.wait(cluster=cluster_name, tasks=[task_arn])
+
+        # Get log events
+        task_id = task_arn.split(cluster_name)[1].strip('/')
+        log_stream_name = '{}/{}'.format(log_stream_prefix, task_id)
+
+        response = logs.get_log_events(
+            logGroupName=log_group_name,
+            logStreamName=log_stream_name,
+            startFromHead=True
+        )
+        migration_logs = response['events']
+        for event in migration_logs:
+            message = event['message']
+            print(message)
+
+        # Get the container exit code - if not zero, houston we have a problem
+        response = ecs.describe_tasks(
+            cluster=cluster_name,
+            tasks=[task_arn]
+        )
+        task_exit_code = response['tasks'][0]['containers'][0]['exitCode']
+        if task_exit_code != 0:
+            print('A migration error has occurred: please see the above logs.', file=sys.stderr)
+            sys.exit(1)
         print('Migrate task complete.')
     except IndexError:
         print('There is no task definition following the "{}-migrate"'

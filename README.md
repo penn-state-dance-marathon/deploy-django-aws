@@ -6,11 +6,23 @@ This action forces a rolling restart of tagged AWS resources to initiate a rolli
 
 ### `application`
 
-**Required** The tagged application name in AWS to redeploy.
+**Required.** The tagged application name in AWS to redeploy.
 
 ### `environment`
 
-**Required** The tagged environment name in AWS to redeploy.
+**Required.** The tagged environment name in AWS to redeploy.
+
+### `logGroupName`
+
+Optional. The name of the log group that stores logs for this application's migration task.
+
+Default: `/ecs/${application}/${environment}`
+
+### `logStreamPrefix`
+
+Optional. The constant portion of the log stream name that prefixes the ECS Task ID.
+
+Default: `ecs-${application}-${environment}/${application}-${environment}
 
 ## Example usage
 
