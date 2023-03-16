@@ -52,7 +52,7 @@ def main():
     cluster_name = '{}-{}'.format(args.application, args.environment)
 
     log_group_name = '/ecs/{}/{}'.format(args.application, args.environment)
-    if 'group' in args:
+    if args['group'] is not None:
         log_group_name = args.group
 
     log_stream_prefix = 'ecs-{}-{}/{}-{}'.format(
@@ -61,7 +61,7 @@ def main():
         args.application,
         args.environment
     )
-    if 'stream' in args:
+    if args['prefix'] is not None:
         log_stream_prefix = args.stream
 
     # Get subnets and security groups to run migration task under
