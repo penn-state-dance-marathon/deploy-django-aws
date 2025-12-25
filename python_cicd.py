@@ -25,7 +25,9 @@ Example:
 import argparse
 import boto3
 import sys
+import time
 
+from botocore.exceptions import ClientError
 from datetime import datetime
 
 
@@ -61,8 +63,8 @@ def main():
         args.application,
         args.environment
     )
-    if args.group is not None:
-        log_stream_prefix = args.stream
+    if args.prefix is not None:
+        log_stream_prefix = args.prefix
 
     # Get subnets and security groups to run migration task under
     ec2 = boto3.client('ec2')
@@ -110,15 +112,40 @@ def main():
         waiter.wait(cluster=cluster_name, tasks=[task_arn])
 
         # Get log events
-        task_id = task_arn.split(cluster_name)[1].strip('/')
+        # ECS task ARN format: arn:aws:ecs:region:account:task/cluster-name/task-id
+        # Extract task ID (the part after the last '/')
+        task_id = task_arn.split('/')[-1]
         log_stream_name = '{}/{}'.format(log_stream_prefix, task_id)
 
-        response = logs.get_log_events(
-            logGroupName=log_group_name,
-            logStreamName=log_stream_name,
-            startFromHead=True
-        )
-        migration_logs = response['events']
+        # Try to get log events with error handling
+        # CloudWatch logs may not be immediately available after task stops
+        max_retries = 5
+        retry_delay = 2  # seconds
+        migration_logs = []
+        
+        for attempt in range(max_retries):
+            try:
+                response = logs.get_log_events(
+                    logGroupName=log_group_name,
+                    logStreamName=log_stream_name,
+                    startFromHead=True
+                )
+                migration_logs = response['events']
+                break
+            except ClientError as e:
+                error_code = e.response.get('Error', {}).get('Code', '')
+                if error_code == 'ResourceNotFoundException':
+                    if attempt < max_retries - 1:
+                        print('Log stream not found yet, waiting {} seconds before retry...'.format(retry_delay))
+                        time.sleep(retry_delay)
+                    else:
+                        print('Warning: Could not retrieve logs from log stream "{}". '
+                              'The log stream may not exist or logs may not be configured.'.format(log_stream_name))
+                        print('Attempting to continue without logs...')
+                else:
+                    # Re-raise if it's a different error
+                    raise
+        
         for event in migration_logs:
             message = event['message']
             print(message)
