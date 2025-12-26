@@ -188,7 +188,7 @@ def main():
     for dist in dists:
         tags = cloudfront.list_tags_for_resource(Resource=dist['ARN'])
         tags = tags['Tags']['Items']
-        time = datetime.now().strftime('%Y%m%d%H%M%S%f')
+        caller_reference = datetime.now().strftime('%Y%m%d%H%M%S%f')
         if app_tag in tags and env_tag in tags:
             cloudfront.create_invalidation(DistributionId=dist['Id'],
                                            InvalidationBatch={
@@ -196,7 +196,7 @@ def main():
                                                    'Quantity': 1,
                                                    'Items': ['/*']
                                                },
-                                               'CallerReference': time})
+                                               'CallerReference': caller_reference})
 
 
 if __name__ == "__main__":
