@@ -155,10 +155,24 @@ def main():
             cluster=cluster_name,
             tasks=[task_arn]
         )
-        task_exit_code = response['tasks'][0]['containers'][0]['exitCode']
+
+        task = response['tasks'][0]
+
+        if not task.get('containers'):
+            print('ERROR: ECS task stopped but no containers were reported.', file=sys.stderr)
+            sys.exit(1)
+
+        container = task['containers'][0]
+        task_exit_code = container.get('exitCode')
+
+        if task_exit_code is None:
+            print('ERROR: ECS container exited without an exit code.', file=sys.stderr)
+            sys.exit(1)
+
         if task_exit_code != 0:
             print('A migration error has occurred: please see the above logs.', file=sys.stderr)
             sys.exit(1)
+
         print('Migrate task complete.')
     except IndexError:
         print('There is no task definition following the "{}-migrate"'
